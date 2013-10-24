@@ -12,15 +12,15 @@ import java.util.concurrent.*;
  */
 public class OrderBook {
 
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>();     //Maintain list of Market Rates offer for Buy
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>();  //Maintain list of Orders offer for Sell
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>();     //Maintain list of Orders offer for Buy
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>();     //Maintain list of Market Rates offer for Buy
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>();  //Maintain list of Orders offer for Sell
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>();     //Maintain list of Orders offer for Buy
 
 
 
     public void addSellMarketQuote(Order sellMarketQuote){
-        ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> rateMap = bidMarketRate.putIfAbsent(sellMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>());
+        ConcurrentNavigableMap<Double, BlockingQueue<Order>> rateMap = bidMarketRate.putIfAbsent(sellMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
 
         rateMap.putIfAbsent(sellMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
 
@@ -46,13 +46,13 @@ public class OrderBook {
     public boolean matchMarketRate(Order marketRate){
         boolean orderSuccess=false;
         if(marketRate.getOfferType().equals(Order.QuoteType.BID)){
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
 
             double quoteRate = marketRate.getQuoteRate();
 
             while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
 
-                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
 
 
                 while(availableOrders.isEmpty()==false
@@ -89,13 +89,13 @@ public class OrderBook {
         }else{
 
 
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
 
             double quoteRate = marketRate.getQuoteRate();
 
             while(quoteRate <= currPairOrders.lastKey() && orderSuccess==false){
 
-                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
 
 
                 while(availableOrders.isEmpty()==false

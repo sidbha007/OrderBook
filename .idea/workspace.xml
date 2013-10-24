@@ -2,11 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" name="Default" comment="Change in Order Class">
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\listener\RateListener.java" afterPath="$PROJECT_DIR$/src/com/mainlab/listener/RateListener.java" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java" />
     </list>
     <ignored path="OrderBook.iws" />
     <ignored path=".idea/workspace.xml" />
-    <file path="$PROJECT_DIR$/../../fxi-main/integral5/FXAdminWeb/.idea/workspace.xml" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382578544663" ignored="false" />
+    <file path="$PROJECT_DIR$/../../fxi-main/integral5/FXAdminWeb/.idea/workspace.xml" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382578964919" ignored="false" />
     <file path="/RateListener.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382577899808" ignored="false" />
     <file path="/a.dummy" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382120783902" ignored="false" />
     <file path="/MarketRate.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382486131811" ignored="false" />
@@ -15,7 +15,7 @@
     <file path="/V1MarketRateSerializer.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382488173638" ignored="false" />
     <file path="/OrderBook.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382568903931" ignored="false" />
     <file path="/MarketRateBean.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382568547624" ignored="false" />
-    <file path="/Dummy.txt" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382576619053" ignored="false" />
+    <file path="/Dummy.txt" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382578923212" ignored="false" />
     <file path="/Order.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382576402500" ignored="false" />
     <option name="TRACKING_ENABLED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -109,14 +109,32 @@
       <file leaf-file-name="OrderBook.java" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="155" column="145" selection-start="5600" selection-end="5600" vertical-scroll-proportion="0.38543516">
+            <state line="97" column="29" selection-start="3659" selection-end="3659" vertical-scroll-proportion="2.928952">
               <folding>
                 <element signature="imports" expanded="true" />
-                <element signature="e#476#543#0" expanded="true" />
-                <element signature="e#729#796#0" expanded="true" />
-                <element signature="e#980#1047#0" expanded="true" />
-                <element signature="e#1221#1288#0" expanded="true" />
+                <element signature="e#467#529#0" expanded="true" />
+                <element signature="e#706#768#0" expanded="true" />
+                <element signature="e#943#1005#0" expanded="true" />
+                <element signature="e#1170#1232#0" expanded="true" />
               </folding>
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="LinkedBlockingQueue.java" pinned="false" current="false" current-in-tab="false">
+        <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/LinkedBlockingQueue.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="45" column="32" selection-start="1696" selection-end="1709" vertical-scroll-proportion="0.0">
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="ConcurrentHashMap.java" pinned="false" current="false" current-in-tab="false">
+        <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/ConcurrentHashMap.java">
+          <provider selected="true" editor-type-id="text-editor">
+            <state line="74" column="32" selection-start="3556" selection-end="3569" vertical-scroll-proportion="0.0">
+              <folding />
             </state>
           </provider>
         </entry>
@@ -124,7 +142,7 @@
       <file leaf-file-name="ConcurrentSkipListMap.java" pinned="false" current="false" current-in-tab="false">
         <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/ConcurrentSkipListMap.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="63" column="13" selection-start="2894" selection-end="2894" vertical-scroll-proportion="0.0">
+            <state line="64" column="37" selection-start="2961" selection-end="2983" vertical-scroll-proportion="0.0">
               <folding />
             </state>
           </provider>
@@ -148,28 +166,10 @@
           </provider>
         </entry>
       </file>
-      <file leaf-file-name="MarketRate.java" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/MarketRate.java">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="37" column="26" selection-start="880" selection-end="880" vertical-scroll-proportion="0.0">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
       <file leaf-file-name="Order.java" pinned="false" current="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/Order.java">
           <provider selected="true" editor-type-id="text-editor">
             <state line="9" column="18" selection-start="198" selection-end="203" vertical-scroll-proportion="0.0">
-              <folding />
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file leaf-file-name="MarketRateSerializer.class" pinned="false" current="false" current-in-tab="false">
-        <entry file="jar://$PROJECT_DIR$/lib/ISCommon.jar!/com/integral/is/message/MarketRateSerializer.class">
-          <provider selected="true" editor-type-id="text-editor">
-            <state line="11" column="50" selection-start="415" selection-end="426" vertical-scroll-proportion="-6.52">
               <folding />
             </state>
           </provider>
@@ -658,7 +658,7 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="15" y="0" width="1580" height="1160" extended-state="0" />
-    <editor active="false" />
+    <editor active="true" />
     <layout>
       <window_info id="Changes" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="JetGradle" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
@@ -674,7 +674,7 @@
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.24967062" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
       <window_info id="Maven Projects" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
       <window_info id="Commander" active="false" anchor="right" auto_hide="false" internal_type="SLIDING" type="SLIDING" visible="false" weight="0.4" sideWeight="0.5" order="5" side_tool="false" content_ui="tabs" />
-      <window_info id="Project" active="true" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24967062" sideWeight="0.670987" order="0" side_tool="false" content_ui="combo" />
+      <window_info id="Project" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.24967062" sideWeight="0.670987" order="0" side_tool="false" content_ui="combo" />
       <window_info id="Run" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.2901296" sideWeight="0.5" order="2" side_tool="false" content_ui="tabs" />
       <window_info id="Cvs" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.25" sideWeight="0.5" order="4" side_tool="false" content_ui="tabs" />
       <window_info id="Message" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="0" side_tool="false" content_ui="tabs" />
@@ -748,18 +748,6 @@
     <option name="FILTER_TARGETS" value="false" />
   </component>
   <component name="editorHistoryManager">
-    <entry file="jar://$PROJECT_DIR$/lib/ISCommon.jar!/com/integral/is/message/MarketRate.class">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="11" column="4" selection-start="290" selection-end="333" vertical-scroll-proportion="-3.24" />
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/.idea/libraries/lib.xml">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="4" column="0" selection-start="131" selection-end="131" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/MarketPrice.java">
       <provider selected="true" editor-type-id="text-editor">
         <state line="10" column="17" selection-start="201" selection-end="201" vertical-scroll-proportion="0.0">
@@ -816,13 +804,6 @@
         </state>
       </provider>
     </entry>
-    <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/ConcurrentSkipListMap.java">
-      <provider selected="true" editor-type-id="text-editor">
-        <state line="63" column="13" selection-start="2894" selection-end="2894" vertical-scroll-proportion="0.0">
-          <folding />
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/src/com/mainlab/listener/RateListener.java">
       <provider selected="true" editor-type-id="text-editor">
         <state line="24" column="38" selection-start="827" selection-end="827" vertical-scroll-proportion="0.0">
@@ -853,15 +834,36 @@
         </state>
       </provider>
     </entry>
+    <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/ConcurrentHashMap.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="74" column="32" selection-start="3556" selection-end="3569" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/ConcurrentSkipListMap.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="64" column="37" selection-start="2961" selection-end="2983" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="jar://C:/java/jrockit-jdk1.6.0_45-R28.2.7-4.1.0/src.zip!/java/util/concurrent/LinkedBlockingQueue.java">
+      <provider selected="true" editor-type-id="text-editor">
+        <state line="45" column="32" selection-start="1696" selection-end="1709" vertical-scroll-proportion="0.0">
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="155" column="145" selection-start="5600" selection-end="5600" vertical-scroll-proportion="0.38543516">
+        <state line="97" column="29" selection-start="3659" selection-end="3659" vertical-scroll-proportion="2.928952">
           <folding>
             <element signature="imports" expanded="true" />
-            <element signature="e#476#543#0" expanded="true" />
-            <element signature="e#729#796#0" expanded="true" />
-            <element signature="e#980#1047#0" expanded="true" />
-            <element signature="e#1221#1288#0" expanded="true" />
+            <element signature="e#467#529#0" expanded="true" />
+            <element signature="e#706#768#0" expanded="true" />
+            <element signature="e#943#1005#0" expanded="true" />
+            <element signature="e#1170#1232#0" expanded="true" />
           </folding>
         </state>
       </provider>
