@@ -12,63 +12,63 @@ import java.util.concurrent.*;
  */
 public class OrderBook {
 
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>>>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>>>();     //Maintain list of Market Rates offer for Buy
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>>> offerOrder= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>>>();  //Maintain list of Orders offer for Sell
-    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>>> bidOrder= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>>>();     //Maintain list of Orders offer for Buy
+    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
+    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>();     //Maintain list of Market Rates offer for Buy
+    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>();  //Maintain list of Orders offer for Sell
+    private ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>>();     //Maintain list of Orders offer for Buy
 
 
 
-    public void addSellMarketQuote(MarketRateBean sellMarketQuote){
-        ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>> rateMap = bidMarketRate.putIfAbsent(sellMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>>());
+    public void addSellMarketQuote(Order sellMarketQuote){
+        ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> rateMap = bidMarketRate.putIfAbsent(sellMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>>());
 
-        rateMap.putIfAbsent(sellMarketQuote.getQuoteRate(), new LinkedBlockingQueue<MarketRateBean>());
+        rateMap.putIfAbsent(sellMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
 
         rateMap.get(sellMarketQuote.getQuoteRate()).;
     }
 
-    public void addBuyMarketQuote(MarketRateBean buyMarketQuote){
+    public void addBuyMarketQuote(Order buyMarketQuote){
 
 
     }
 
 
-    public void addbidOrder(OrderBean bidOrder){
+    public void addbidOrder(Order bidOrder){
 
 
     }
 
-    public void addofferOrder(OrderBean offerOrder){
+    public void addofferOrder(Order offerOrder){
 
 
     }
 
-    public boolean matchMarketRate(MarketRateBean marketRate){
+    public boolean matchMarketRate(Order marketRate){
         boolean orderSuccess=false;
-        if(marketRate.getOfferType().equals(MarketRateBean.QuoteType.BID)){
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+        if(marketRate.getOfferType().equals(Order.QuoteType.BID)){
+            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
 
             double quoteRate = marketRate.getQuoteRate();
 
             while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
 
-                LinkedBlockingQueue<OrderBean> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
 
 
                 while(availableOrders.isEmpty()==false
                         || orderSuccess==false){
-                    OrderBean orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalAvailable() >= orderAvl.getTotalOrder()){
+                    Order orderAvl = availableOrders.peek();
+                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
                         //BUY is success
 
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalAvailable());
+                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
                         if(orderAvl.getTotalOrder()==0){
                             availableOrders.poll();
                         }
 
                         orderSuccess = true;
                     }else{
-                        marketRate.setTotalAvailable(marketRate.getTotalAvailable() - orderAvl.getTotalOrder());
+                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
                         availableOrders.poll();
                     }
 
@@ -89,29 +89,29 @@ public class OrderBook {
         }else{
 
 
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
 
             double quoteRate = marketRate.getQuoteRate();
 
             while(quoteRate <= currPairOrders.lastKey() && orderSuccess==false){
 
-                LinkedBlockingQueue<OrderBean> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
 
 
                 while(availableOrders.isEmpty()==false
                         || orderSuccess==false){
-                    OrderBean orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalAvailable() >= orderAvl.getTotalOrder()){
+                    Order orderAvl = availableOrders.peek();
+                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
                         //SELL is success
 
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalAvailable());
+                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
                         if(orderAvl.getTotalOrder()==0){
                             availableOrders.poll();
                         }
 
                         orderSuccess = true;
                     }else{
-                        marketRate.setTotalAvailable(marketRate.getTotalAvailable() - orderAvl.getTotalOrder());
+                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
                         availableOrders.poll();
                     }
 
@@ -136,39 +136,39 @@ public class OrderBook {
 
     }
 
-    public boolean matchOrder(OrderBean orderRate){
+    public boolean matchOrder(Order orderRate){
 
         boolean orderSuccess=false;
-        if(orderRate.getOfferType().equals(MarketRateBean.QuoteType.BID)){
+        if(orderRate.getOfferType().equals(Order.QuoteType.BID)){
 
             boolean useMarketRate =( bidMarketRate.get(orderRate.getCurrPair()).firstKey() >= offerOrder.get(orderRate.getCurrPair()).firstKey());
 
             if(useMarketRate) {
                 //do a lock on  bidMarketRate
 
-                ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+                ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
 
                 double quoteRate = marketRate.getQuoteRate();
 
                 while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
 
-                    LinkedBlockingQueue<OrderBean> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+                    LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
 
 
                     while(availableOrders.isEmpty()==false
                             || orderSuccess==false){
-                        OrderBean orderAvl = availableOrders.peek();
-                        if(marketRate.getTotalAvailable() >= orderAvl.getTotalOrder()){
+                        Order orderAvl = availableOrders.peek();
+                        if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
                             //BUY is success
 
-                            orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalAvailable());
+                            orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
                             if(orderAvl.getTotalOrder()==0){
                                 availableOrders.poll();
                             }
 
                             orderSuccess = true;
                         }else{
-                            marketRate.setTotalAvailable(marketRate.getTotalAvailable() - orderAvl.getTotalOrder());
+                            marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
                             availableOrders.poll();
                         }
 
@@ -194,8 +194,8 @@ public class OrderBook {
 
 
 
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<MarketRateBean>> currPairMktOrders = bidMarketRate.get(orderRate.getCurrPair()) ;
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>> currPairOrdOrders = offerOrder.get(orderRate.getCurrPair()) ;
+            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairMktOrders = bidMarketRate.get(orderRate.getCurrPair()) ;
+            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrdOrders = offerOrder.get(orderRate.getCurrPair()) ;
             
             
             
@@ -215,23 +215,23 @@ public class OrderBook {
 
             while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
 
-                LinkedBlockingQueue<OrderBean> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
 
 
                 while(availableOrders.isEmpty()==false
                         || orderSuccess==false){
-                    OrderBean orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalAvailable() >= orderAvl.getTotalOrder()){
+                    Order orderAvl = availableOrders.peek();
+                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
                         //BUY is success
 
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalAvailable());
+                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
                         if(orderAvl.getTotalOrder()==0){
                             availableOrders.poll();
                         }
 
                         orderSuccess = true;
                     }else{
-                        marketRate.setTotalAvailable(marketRate.getTotalAvailable() - orderAvl.getTotalOrder());
+                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
                         availableOrders.poll();
                     }
 
@@ -252,29 +252,29 @@ public class OrderBook {
         }else{
 
 
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<OrderBean>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
 
             double quoteRate = marketRate.getQuoteRate();
 
             while(quoteRate <= currPairOrders.lastKey() && orderSuccess==false){
 
-                LinkedBlockingQueue<OrderBean> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
 
 
                 while(availableOrders.isEmpty()==false
                         || orderSuccess==false){
-                    OrderBean orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalAvailable() >= orderAvl.getTotalOrder()){
+                    Order orderAvl = availableOrders.peek();
+                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
                         //SELL is success
 
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalAvailable());
+                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
                         if(orderAvl.getTotalOrder()==0){
                             availableOrders.poll();
                         }
 
                         orderSuccess = true;
                     }else{
-                        marketRate.setTotalAvailable(marketRate.getTotalAvailable() - orderAvl.getTotalOrder());
+                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
                         availableOrders.poll();
                     }
 
