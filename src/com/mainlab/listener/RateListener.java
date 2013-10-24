@@ -1,8 +1,7 @@
-package listener;
+package com.mainlab.listener;
 
 import com.integral.is.message.MarketRate;
 import com.integral.is.message.MarketRateSerializer;
-import com.integral.is.message.MarketRateSerializerFactory;
 import com.integral.is.message.V1MarketRateSerializer;
 
 import javax.jms.*;

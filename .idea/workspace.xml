@@ -2,19 +2,11 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" name="Default" comment="Change in Order Class">
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\MarketPrice.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/MarketPrice.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\MarketRate.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/MarketRate.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\MarketRateBean.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/MarketRateBean.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\MarketRateC.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/MarketRateC.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\Order.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/Order.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\OrderBean.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/OrderBean.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\OrderBook.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java" />
-      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\message\V1MarketRateSerializer.java" afterPath="$PROJECT_DIR$/src/com/mainlab/order/V1MarketRateSerializer.java" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/src/listener/RateListener.java" afterPath="$PROJECT_DIR$/src/listener/RateListener.java" />
+      <change type="MOVED" beforePath="C:\svn_views\proj\OrderBook\src\listener\RateListener.java" afterPath="$PROJECT_DIR$/src/com/mainlab/listener/RateListener.java" />
     </list>
     <ignored path="OrderBook.iws" />
     <ignored path=".idea/workspace.xml" />
-    <file path="$PROJECT_DIR$/../../fxi-main/integral5/FXAdminWeb/.idea/workspace.xml" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382578071961" ignored="false" />
+    <file path="$PROJECT_DIR$/../../fxi-main/integral5/FXAdminWeb/.idea/workspace.xml" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382578544663" ignored="false" />
     <file path="/RateListener.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382577899808" ignored="false" />
     <file path="/a.dummy" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382120783902" ignored="false" />
     <file path="/MarketRate.java" changelist="b73aeaae-2ed8-42e0-a5db-17d3efc5aa44" time="1382486131811" ignored="false" />
@@ -86,9 +78,9 @@
   <component name="FileEditorManager">
     <leaf>
       <file leaf-file-name="RateListener.java" pinned="false" current="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/src/listener/RateListener.java">
+        <entry file="file://$PROJECT_DIR$/src/com/mainlab/listener/RateListener.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="25" column="38" selection-start="875" selection-end="875" vertical-scroll-proportion="0.0">
+            <state line="24" column="38" selection-start="827" selection-end="827" vertical-scroll-proportion="0.0">
               <folding>
                 <element signature="imports" expanded="true" />
               </folding>
@@ -117,7 +109,7 @@
       <file leaf-file-name="OrderBook.java" pinned="false" current="true" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java">
           <provider selected="true" editor-type-id="text-editor">
-            <state line="165" column="22" selection-start="6099" selection-end="6099" vertical-scroll-proportion="0.687389">
+            <state line="155" column="145" selection-start="5600" selection-end="5600" vertical-scroll-proportion="0.38543516">
               <folding>
                 <element signature="imports" expanded="true" />
                 <element signature="e#476#543#0" expanded="true" />
@@ -295,7 +287,11 @@
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
             <PATH_ELEMENT>
-              <option name="myItemId" value="listener" />
+              <option name="myItemId" value="mainlab" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="order" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -313,7 +309,11 @@
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
             <PATH_ELEMENT>
-              <option name="myItemId" value="order" />
+              <option name="myItemId" value="mainlab" />
+              <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
+            </PATH_ELEMENT>
+            <PATH_ELEMENT>
+              <option name="myItemId" value="listener" />
               <option name="myItemType" value="com.intellij.ide.projectView.impl.nodes.PsiDirectoryNode" />
             </PATH_ELEMENT>
           </PATH>
@@ -514,7 +514,7 @@
   </component>
   <component name="RunManager" selected="Application.RateListener">
     <configuration default="false" name="RateListener" type="Application" factoryName="Application" temporary="true">
-      <option name="MAIN_CLASS_NAME" value="listener.RateListener" />
+      <option name="MAIN_CLASS_NAME" value="com.mainlab.listener.RateListener" />
       <option name="VM_PARAMETERS" />
       <option name="PROGRAM_PARAMETERS" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
@@ -823,9 +823,9 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/src/listener/RateListener.java">
+    <entry file="file://$PROJECT_DIR$/src/com/mainlab/listener/RateListener.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="25" column="38" selection-start="875" selection-end="875" vertical-scroll-proportion="0.0">
+        <state line="24" column="38" selection-start="827" selection-end="827" vertical-scroll-proportion="0.0">
           <folding>
             <element signature="imports" expanded="true" />
           </folding>
@@ -855,7 +855,7 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/src/com/mainlab/order/OrderBook.java">
       <provider selected="true" editor-type-id="text-editor">
-        <state line="165" column="22" selection-start="6099" selection-end="6099" vertical-scroll-proportion="0.687389">
+        <state line="155" column="145" selection-start="5600" selection-end="5600" vertical-scroll-proportion="0.38543516">
           <folding>
             <element signature="imports" expanded="true" />
             <element signature="e#476#543#0" expanded="true" />
