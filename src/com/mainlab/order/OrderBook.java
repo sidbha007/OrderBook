@@ -1,4 +1,4 @@
-package message;
+package com.mainlab.order;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
@@ -24,7 +24,7 @@ public class OrderBook {
 
         rateMap.putIfAbsent(sellMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
 
-        rateMap.get(sellMarketQuote.getQuoteRate()).;
+        rateMap.get(sellMarketQuote.getQuoteRate());
     }
 
     public void addBuyMarketQuote(Order buyMarketQuote){
@@ -146,9 +146,9 @@ public class OrderBook {
             if(useMarketRate) {
                 //do a lock on  bidMarketRate
 
-                ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+                ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = offerOrder.get(orderRate.getCurrPair()) ;
 
-                double quoteRate = marketRate.getQuoteRate();
+                double quoteRate = orderRate.getQuoteRate();
 
                 while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
 

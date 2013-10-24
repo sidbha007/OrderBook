@@ -49,7 +49,7 @@ public class RateListener implements MessageListener {
                 System.out.println( "Rate is null for Adaptor ");
 
             }else{
-                System.out.println( rate.getBaseCcy() + " " + rate.getQuoteId());
+                System.out.println( rate.getBaseCcy() + " " + rate.getQuoteId() + " " + rate.getBaseCcy() + " " + rate.getBidLimit() + " " + rate.getBaseCcyIndex() + " " + rate.getProviderShortName() + " " + rate.getAllTiers() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId());
             }
         }
         catch ( Exception ex )

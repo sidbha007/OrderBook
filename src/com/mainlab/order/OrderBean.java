@@ -1,4 +1,4 @@
-package message;
+package com.mainlab.order;
 
 /**
  * Created with IntelliJ IDEA.

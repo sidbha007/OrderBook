@@ -1,4 +1,4 @@
-package message;
+package com.mainlab.order;
 
 import com.integral.is.message.MarketRateSideRate;
 import com.integral.time.IdcDate;
