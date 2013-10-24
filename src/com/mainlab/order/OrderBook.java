@@ -265,21 +265,34 @@ public class OrderBook {
     }
 
 
-
+    static String[] currPairs = new String[]{"EUR/USD", "EUR/JPY", "INR/USD", "INR/JPY", "USD/CHA", "CHA, JPY"};
+    static volatile int i=0;
     public static void main(String params[]){
-        OrderBook orderBook = OrderBook.getInstance();
+
         
-        String[] currPairs = new String[]{"EUR/USD", "EUR/JPY", "INR/USD", "INR/JPY", "USD/CHA", "CHA, JPY"};
-        for(int i=0; i< 500; i++){
-			orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB",currPairs[i%6],50000, Order.QuoteType.BID, 1.1234));
-			orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA",currPairs[(i+1)%6],50000, Order.QuoteType.BID, 1.1234));
-			orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC", currPairs[i%6], 10000, Order.QuoteType.OFFER, 1.1234));
-			orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 1,currPairs[i%6],30000, Order.QuoteType.OFFER, 1.1233));
-			orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 2,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
-			orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 3,currPairs[(i+1)%6],30000, Order.QuoteType.OFFER, 1.1233));
-			orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 4,currPairs[i%6],8000, Order.QuoteType.OFFER, 1.1233));
-			orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 5,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
-			orderBook.addBidOrder(Order.createNewOrder(((i+1)*6) + 6, currPairs[i%6], 10000, Order.QuoteType.BID, 1.1235));
+
+        ExecutorService executor = Executors.newFixedThreadPool(5);
+        for(i=0; i< 500; i++){
+
+
+            executor.execute(new Runnable(){
+
+                public void run(){
+                    OrderBook orderBook = OrderBook.getInstance();
+                    orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB",currPairs[i%6],50000, Order.QuoteType.BID, 1.1234));
+                    orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA",currPairs[(i+1)%6],50000, Order.QuoteType.BID, 1.1234));
+                    orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC", currPairs[i%6], 10000, Order.QuoteType.OFFER, 1.1234));
+                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 1,currPairs[i%6],30000, Order.QuoteType.OFFER, 1.1233));
+                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 2,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
+                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 3,currPairs[(i+1)%6],30000, Order.QuoteType.OFFER, 1.1233));
+                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 4,currPairs[i%6],8000, Order.QuoteType.OFFER, 1.1233));
+                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 5,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
+                    orderBook.addBidOrder(Order.createNewOrder(((i+1)*6) + 6, currPairs[i%6], 10000, Order.QuoteType.BID, 1.1235));
+                }
+
+
+            });
+
 		
 		
 		}
