@@ -1,3 +1,7 @@
+
+
+
+
 package com.mainlab.order;
 
 import java.util.Queue;
@@ -14,7 +18,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * Time: 11:48 AM
  * To change this template use File | Settings | File Templates.
  */
-public class OrderBook {
+public class OrderBookV2 {
 
     private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
     private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Buy
@@ -28,9 +32,9 @@ public class OrderBook {
 
     private Queue<OrderLog> orderDoneLog = new ConcurrentLinkedQueue<OrderLog>();
 
-    private static OrderBook uniqueInstance = new OrderBook();
+    private static OrderBookV2 uniqueInstance = new OrderBookV2();
 
-    public static OrderBook getInstance(){
+    public static OrderBookV2 getInstance(){
         return uniqueInstance;
     }
 
@@ -91,7 +95,7 @@ public class OrderBook {
     }
 
 
-    private OrderBook(){
+    private OrderBookV2(){
 
     }
 
@@ -138,36 +142,43 @@ public class OrderBook {
         if(marketRate.getOfferType().equals(Order.QuoteType.BID) && null!=offerOrder && null!=offerOrder.get(marketRate.getCurrPair())){
 
             ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+            offerOrderLock.get(marketRate.getCurrPair()).lock();
+            try{
+                while(orderSuccess==false && currPairOrders.isEmpty()==false
+                        && marketRate.getQuoteRate() >= currPairOrders.firstKey()){
 
-            while(orderSuccess==false && currPairOrders.isEmpty()==false
-                    && marketRate.getQuoteRate() >= currPairOrders.firstKey()){
+                    BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
 
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+                    orderSuccess =  doOrder(marketRate, availableOrders);
 
-                orderSuccess =  doOrder(marketRate, availableOrders);
+                    if(availableOrders.isEmpty() == true){
+                        currPairOrders.pollFirstEntry();
+                    }
 
-                if(availableOrders.isEmpty() == true){
-                    currPairOrders.pollFirstEntry();
                 }
-
+            }finally{
+                offerOrderLock.get(marketRate.getCurrPair()).unlock();
             }
 
         }else if(null!=bidOrder && null!=bidOrder.get(marketRate.getCurrPair())){
 
             ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+            bidOrderLock.get(marketRate.getCurrPair()).lock();
+            try{
+                while(orderSuccess==false && currPairOrders.isEmpty()==false
+                        && marketRate.getQuoteRate() <= currPairOrders.lastKey()){
 
-            while(orderSuccess==false && currPairOrders.isEmpty()==false
-                    && marketRate.getQuoteRate() <= currPairOrders.lastKey()){
+                    BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                    orderSuccess =  doOrder(marketRate, availableOrders);
 
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
-                orderSuccess =  doOrder(marketRate, availableOrders);
+                    if(availableOrders.isEmpty() == true){
+                        currPairOrders.pollFirstEntry();
+                    }
 
-                if(availableOrders.isEmpty() == true){
-                    currPairOrders.pollFirstEntry();
                 }
-
+            }finally{
+                bidOrderLock.get(marketRate.getCurrPair()).unlock();
             }
-
         }
 
         return orderSuccess;
@@ -206,7 +217,7 @@ public class OrderBook {
         boolean orderSuccess=false;
         if(orderRate.getOfferType().equals(Order.QuoteType.BID) &&
                 ((null!=offerMarketRate && null!=offerMarketRate.get(orderRate.getCurrPair()))
-                 || (null!=offerOrder && null!=offerOrder.get(orderRate.getCurrPair())))
+                        || (null!=offerOrder && null!=offerOrder.get(orderRate.getCurrPair())))
                 ){
 
             boolean useMarketRate =useMarketRateBid(orderRate);
@@ -216,11 +227,28 @@ public class OrderBook {
 
             while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
                     && orderRate.getQuoteRate() >= currPairOrders.lastKey()){
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
-                orderSuccess =  doOrder(orderRate, availableOrders);
+                if(useMarketRate==true){
+                    offerMarketRateLock.get(orderRate.getCurrPair()).lock();
+                } else{
+                    offerOrderLock.get(orderRate.getCurrPair()).lock();
+                }
 
-                if(availableOrders.isEmpty() == true){
-                    currPairOrders.pollFirstEntry();
+                try{
+                    if( currPairOrders!=null && currPairOrders.isEmpty()==false
+                            && orderRate.getQuoteRate() >= currPairOrders.lastKey()) {
+                        BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                        orderSuccess =  doOrder(orderRate, availableOrders);
+
+                        if(availableOrders.isEmpty() == true){
+                            currPairOrders.pollFirstEntry();
+                        }
+                    }
+                }finally{
+                    if(useMarketRate==true){
+                        offerMarketRateLock.get(orderRate.getCurrPair()).unlock();
+                    } else{
+                        offerOrderLock.get(orderRate.getCurrPair()).unlock();
+                    }
                 }
 
                 useMarketRate =useMarketRateBid(orderRate);
@@ -233,7 +261,7 @@ public class OrderBook {
         }else if(
                 (null!=bidMarketRate && null!=bidMarketRate.get(orderRate.getCurrPair()))
                         || (null!=bidOrder && null!=bidOrder.get(orderRate.getCurrPair()))
-        ){
+                ){
 
             boolean useMarketRate =useMarketRateOffer(orderRate);
 
@@ -242,13 +270,30 @@ public class OrderBook {
 
             while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
                     && orderRate.getQuoteRate() <= currPairOrders.lastKey()){
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
-                orderSuccess =  doOrder(orderRate, availableOrders);
 
-                if(availableOrders.isEmpty() == true){
-                    currPairOrders.pollFirstEntry();
+                if(useMarketRate==true){
+                    bidMarketRateLock.get(orderRate.getCurrPair()).lock();
+                } else{
+                    bidOrderLock.get(orderRate.getCurrPair()).lock();
                 }
+                try{
+                    if( currPairOrders!=null && currPairOrders.isEmpty()==false
+                            && orderRate.getQuoteRate() <= currPairOrders.lastKey()) {
 
+                        BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                        orderSuccess =  doOrder(orderRate, availableOrders);
+
+                        if(availableOrders.isEmpty() == true){
+                            currPairOrders.pollFirstEntry();
+                        }
+                    }
+                }finally{
+                    if(useMarketRate==true){
+                        bidMarketRateLock.get(orderRate.getCurrPair()).unlock();
+                    } else{
+                        bidOrderLock.get(orderRate.getCurrPair()).unlock();
+                    }
+                }
                 useMarketRate =useMarketRateOffer(orderRate);
                 currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
 
@@ -270,15 +315,15 @@ public class OrderBook {
     public static void main(String params[]){
 
 
-        OrderBook orderBook = OrderBook.getInstance();
-        //ExecutorService executor = Executors.newFixedThreadPool(5);
-        for(i=0; i< 2500; i++){
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+        for(i=0; i< 1500; i++){
 
 
-           /* executor.execute(new Runnable(){
+            executor.execute(new Runnable(){
 
-                public void run(){   */
-                    //OrderBook orderBook = OrderBook.getInstance();
+                public void run(){
+                    OrderBookV2 orderBook = OrderBookV2.getInstance();
                     orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB",currPairs[i%6],50000, Order.QuoteType.BID, 1.1234));
                     orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA",currPairs[(i+1)%6],50000, Order.QuoteType.BID, 1.1234));
                     orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC", currPairs[i%6], 10000, Order.QuoteType.OFFER, 1.1234));
@@ -288,15 +333,15 @@ public class OrderBook {
                     orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 4,currPairs[i%6],8000, Order.QuoteType.OFFER, 1.1233));
                     orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 5,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
                     orderBook.addBidOrder(Order.createNewOrder(((i+1)*6) + 6, currPairs[i%6], 10000, Order.QuoteType.BID, 1.1235));
-               // }
+                }
 
 
-           // });
+            });
 
-		
-		
-		}
-	}
+
+
+        }
+    }
 
 
 }
