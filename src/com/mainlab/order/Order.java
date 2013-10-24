@@ -1,5 +1,7 @@
 package com.mainlab.order;
 
+import java.util.Date;
+
 /**
  * Created with IntelliJ IDEA.
  * User: bhaskars
@@ -18,6 +20,31 @@ public class Order {
     private int orderId;
     private double quoteRate;
     private long timestamp;
+
+    private Order() {
+    }
+
+    public static Order createNewOrder(int orderId, String currPair, long totalOrder, QuoteType offerType,  double quoteRate) {
+        Order order = new Order();
+        order.setCurrPair(currPair);
+        order.setTotalOrder(totalOrder);
+        order.setOfferType(offerType);
+        order.setOrderId(orderId);
+        order.setQuoteRate(quoteRate);
+        order.setTimestamp((new Date()).getTime());
+        return order;
+    }
+
+    public static Order createNewMarketOrder(String liqProvider, String currPair, long totalOrder, QuoteType offerType, double quoteRate) {
+        Order order = new Order();
+        order.setCurrPair(currPair);
+        order.setTotalOrder(totalOrder);
+        order.setOfferType(offerType);
+        order.setLiqProvider(liqProvider);
+        order.setQuoteRate(quoteRate);
+        order.setTimestamp((new Date()).getTime());
+        return order;
+    }
 
     public String getLiqProvider() {
         return liqProvider;
@@ -73,5 +100,18 @@ public class Order {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    @Override
+    public String toString() {
+        return "Order{" +
+                "liqProvider='" + liqProvider + '\'' +
+                ", currPair='" + currPair + '\'' +
+                ", totalOrder=" + totalOrder +
+                ", offerType=" + offerType +
+                ", orderId=" + orderId +
+                ", quoteRate=" + quoteRate +
+                ", timestamp=" + timestamp +
+                '}';
     }
 }

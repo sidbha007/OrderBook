@@ -3,6 +3,9 @@ package com.mainlab.order;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+
 /**
  * Created with IntelliJ IDEA.
  * User: Siddharth
@@ -13,288 +16,238 @@ import java.util.concurrent.*;
 public class OrderBook {
 
     private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>();     //Maintain list of Market Rates offer for Buy
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>();  //Maintain list of Orders offer for Sell
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>();     //Maintain list of Orders offer for Buy
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Buy
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Orders offer for Sell
+    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Orders offer for Buy
 
+    private ConcurrentMap<String, Lock> bidMarketRateLock = new ConcurrentHashMap<String, Lock>(); //Maintain list of Market Rates offer for Sell
+    private ConcurrentMap<String, Lock> offerMarketRateLock = new ConcurrentHashMap<String, Lock>();
+    private ConcurrentMap<String, Lock> offerOrderLock = new ConcurrentHashMap<String, Lock>();
+    private ConcurrentMap<String, Lock> bidOrderLock = new ConcurrentHashMap<String, Lock>();
 
+    private static OrderBook uniqueInstance = new OrderBook();
 
-    public void addSellMarketQuote(Order sellMarketQuote){
-        ConcurrentNavigableMap<Double, BlockingQueue<Order>> rateMap = bidMarketRate.putIfAbsent(sellMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-
-        rateMap.putIfAbsent(sellMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
-
-        rateMap.get(sellMarketQuote.getQuoteRate());
-    }
-
-    public void addBuyMarketQuote(Order buyMarketQuote){
-
-
+    public static OrderBook getInstance(){
+        return uniqueInstance;
     }
 
 
-    public void addbidOrder(Order bidOrder){
 
+    public void addOfferMarketQuote(Order offerMarketQuote){
+
+        //System.out.println(offerMarketQuote);
+        offerMarketRateLock.putIfAbsent(offerMarketQuote.getCurrPair(), new ReentrantLock());
+        boolean orderSuccess=matchMarketRate(offerMarketQuote);
+        if(orderSuccess==false){
+            offerMarketRate.putIfAbsent(offerMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerMarketRate.get(offerMarketQuote.getCurrPair());
+            currMap.putIfAbsent(offerMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
+            currMap.get(offerMarketQuote.getQuoteRate()).add(offerMarketQuote);
+        }
+        //System.out.println(offerMarketQuote);
+    }
+
+    public void addBidMarketQuote(Order bidMarketQuote){
+        //System.out.println(bidMarketQuote);
+        bidMarketRateLock.putIfAbsent(bidMarketQuote.getCurrPair(), new ReentrantLock());
+        boolean orderSuccess=matchMarketRate(bidMarketQuote);
+        if(orderSuccess==false){
+            bidMarketRate.putIfAbsent(bidMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidMarketRate.get(bidMarketQuote.getCurrPair());
+            currMap.putIfAbsent(bidMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
+            currMap.get(bidMarketQuote.getQuoteRate()).add(bidMarketQuote);
+        }
+        //System.out.println(bidMarketQuote);
+    }
+
+
+    public void addBidOrder(Order bidOrderQuote){
+        //System.out.println(bidOrderQuote);
+        bidOrderLock.putIfAbsent(bidOrderQuote.getCurrPair(), new ReentrantLock());
+        boolean orderSuccess=matchOrder(bidOrderQuote);
+        if(orderSuccess==false){
+            bidOrder.putIfAbsent(bidOrderQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidOrder.get(bidOrderQuote.getCurrPair()) ;
+            currMap.putIfAbsent(bidOrderQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
+            currMap.get(bidOrderQuote.getQuoteRate()).add(bidOrderQuote);
+        }
+        //System.out.println(bidOrderQuote);
+    }
+
+    public void addOfferOrder(Order offerOrderQuote){
+        //System.out.println(offerOrderQuote);
+        offerOrderLock.putIfAbsent(offerOrderQuote.getCurrPair(), new ReentrantLock());
+        boolean orderSuccess=matchOrder(offerOrderQuote);
+        if(orderSuccess==false){
+            offerOrder.putIfAbsent(offerOrderQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerOrder.get(offerOrderQuote.getCurrPair()) ;
+            currMap.putIfAbsent(offerOrderQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
+            currMap.get(offerOrderQuote.getQuoteRate()).add(offerOrderQuote);
+        }
+        //System.out.println(offerOrderQuote);
+    }
+
+
+    private OrderBook(){
 
     }
 
-    public void addofferOrder(Order offerOrder){
 
 
-    }
 
-    public boolean matchMarketRate(Order marketRate){
-        boolean orderSuccess=false;
-        if(marketRate.getOfferType().equals(Order.QuoteType.BID)){
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+    public boolean doOrder(Order order, BlockingQueue<Order> availableLiquidity){
 
-            double quoteRate = marketRate.getQuoteRate();
+        while(availableLiquidity.isEmpty()==false){
+            Order liqAvl = availableLiquidity.peek();
+            if(order.getTotalOrder() <= liqAvl.getTotalOrder()){
+                //BUY is success
 
-            while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
-
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
-
-
-                while(availableOrders.isEmpty()==false
-                        || orderSuccess==false){
-                    Order orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
-                        //BUY is success
-
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
-                        if(orderAvl.getTotalOrder()==0){
-                            availableOrders.poll();
-                        }
-
-                        orderSuccess = true;
-                    }else{
-                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
-                        availableOrders.poll();
-                    }
-
-                    if(availableOrders.isEmpty() == true){
-                        currPairOrders.pollFirstEntry();
-                    }
-
+                liqAvl.setTotalOrder(liqAvl.getTotalOrder() - order.getTotalOrder());
+                System.out.println("Full Match Occured between\n" + order + "\n" + liqAvl );
+                if(liqAvl.getTotalOrder()==0){
+                    availableLiquidity.poll();
                 }
-
-
-
-
+                return true;
+            }else{
+                order.setTotalOrder(order.getTotalOrder() - liqAvl.getTotalOrder());
+                System.out.println("Partial Match Occured between\n" + order + "\n" + liqAvl );
+                availableLiquidity.poll();
             }
-
-
-
-
-        }else{
-
-
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
-
-            double quoteRate = marketRate.getQuoteRate();
-
-            while(quoteRate <= currPairOrders.lastKey() && orderSuccess==false){
-
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
-
-
-                while(availableOrders.isEmpty()==false
-                        || orderSuccess==false){
-                    Order orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
-                        //SELL is success
-
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
-                        if(orderAvl.getTotalOrder()==0){
-                            availableOrders.poll();
-                        }
-
-                        orderSuccess = true;
-                    }else{
-                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
-                        availableOrders.poll();
-                    }
-
-                    if(availableOrders.isEmpty() == true){
-                        currPairOrders.pollLastEntry();
-                    }
-
-                }
-
-
-
-
-            }
-
-
-
 
         }
 
-        return   orderSuccess;
+        return false;
+    }
 
+    private enum OrderType {
+        LP_BID, LP_OFFER, ORDER_BID, ORDER_OFFER
+    }
+
+
+    public boolean matchMarketRate(Order marketRate){
+        boolean orderSuccess=false;
+        if(marketRate.getOfferType().equals(Order.QuoteType.BID) && null!=offerOrder && null!=offerOrder.get(marketRate.getCurrPair())){
+
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+
+            while(orderSuccess==false && currPairOrders.isEmpty()==false
+                    && marketRate.getQuoteRate() >= currPairOrders.firstKey()){
+
+                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+
+                orderSuccess =  doOrder(marketRate, availableOrders);
+
+                if(availableOrders.isEmpty() == true){
+                    currPairOrders.pollFirstEntry();
+                }
+
+            }
+
+        }else if(null!=bidOrder && null!=bidOrder.get(marketRate.getCurrPair())){
+
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+
+            while(orderSuccess==false && currPairOrders.isEmpty()==false
+                    && marketRate.getQuoteRate() <= currPairOrders.lastKey()){
+
+                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                orderSuccess =  doOrder(marketRate, availableOrders);
+
+                if(availableOrders.isEmpty() == true){
+                    currPairOrders.pollFirstEntry();
+                }
+
+            }
+
+        }
+
+        return orderSuccess;
+
+
+    }
+
+
+    private boolean useMarketRateBid(Order orderRate){
+        if(null==offerMarketRate || null==offerMarketRate.get(orderRate.getCurrPair())
+                || offerMarketRate.get(orderRate.getCurrPair()).isEmpty()==true){
+            return false;
+        }else if(null==offerOrder || null==offerOrder.get(orderRate.getCurrPair())
+                || offerOrder.get(orderRate.getCurrPair()).isEmpty()==true){
+            return true;
+        }else{
+            return ( offerMarketRate.get(orderRate.getCurrPair()).firstKey() <= offerOrder.get(orderRate.getCurrPair()).firstKey());
+        }
+    }
+
+    private boolean useMarketRateOffer(Order orderRate){
+        if(null==bidMarketRate || null==bidMarketRate.get(orderRate.getCurrPair())
+                || bidMarketRate.get(orderRate.getCurrPair()).isEmpty()==true){
+            return false;
+        }else if(null==bidOrder || null==bidOrder.get(orderRate.getCurrPair())
+                || bidOrder.get(orderRate.getCurrPair()).isEmpty()==true){
+            return true;
+        }else{
+            return ( bidMarketRate.get(orderRate.getCurrPair()).firstKey() >= bidOrder.get(orderRate.getCurrPair()).firstKey());
+        }
 
     }
 
     public boolean matchOrder(Order orderRate){
 
         boolean orderSuccess=false;
-        if(orderRate.getOfferType().equals(Order.QuoteType.BID)){
+        if(orderRate.getOfferType().equals(Order.QuoteType.BID) &&
+                ((null!=offerMarketRate && null!=offerMarketRate.get(orderRate.getCurrPair()))
+                 || (null!=offerOrder && null!=offerOrder.get(orderRate.getCurrPair())))
+                ){
 
-            boolean useMarketRate =( bidMarketRate.get(orderRate.getCurrPair()).firstKey() >= offerOrder.get(orderRate.getCurrPair()).firstKey());
-
-            if(useMarketRate) {
-                //do a lock on  bidMarketRate
-
-                ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = offerOrder.get(orderRate.getCurrPair()) ;
-
-                double quoteRate = orderRate.getQuoteRate();
-
-                while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
-
-                    LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+            boolean useMarketRate =useMarketRateBid(orderRate);
 
 
-                    while(availableOrders.isEmpty()==false
-                            || orderSuccess==false){
-                        Order orderAvl = availableOrders.peek();
-                        if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
-                            //BUY is success
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?offerMarketRate.get(orderRate.getCurrPair()):offerOrder.get(orderRate.getCurrPair())) ;
 
-                            orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
-                            if(orderAvl.getTotalOrder()==0){
-                                availableOrders.poll();
-                            }
+            while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
+                    && orderRate.getQuoteRate() >= currPairOrders.lastKey()){
+                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                orderSuccess =  doOrder(orderRate, availableOrders);
 
-                            orderSuccess = true;
-                        }else{
-                            marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
-                            availableOrders.poll();
-                        }
-
-                        if(availableOrders.isEmpty() == true){
-                            currPairOrders.pollFirstEntry();
-                        }
-
-                    }
-
-
-
-
+                if(availableOrders.isEmpty() == true){
+                    currPairOrders.pollFirstEntry();
                 }
 
-
-
-            }else{
-                //do a lock on  offerOrder
-
+                useMarketRate =useMarketRateBid(orderRate);
+                currPairOrders = (useMarketRate==true?offerMarketRate.get(orderRate.getCurrPair()):offerOrder.get(orderRate.getCurrPair())) ;
 
 
             }
 
 
+        }else if(
+                (null!=bidMarketRate && null!=bidMarketRate.get(orderRate.getCurrPair()))
+                        || (null!=bidOrder && null!=bidOrder.get(orderRate.getCurrPair()))
+        ){
 
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairMktOrders = bidMarketRate.get(orderRate.getCurrPair()) ;
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrdOrders = offerOrder.get(orderRate.getCurrPair()) ;
-            
-            
-            
-            
-            
-            while(orderSuccess==false  &&  ){
+            boolean useMarketRate =useMarketRateOffer(orderRate);
 
 
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
 
+            while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
+                    && orderRate.getQuoteRate() <= currPairOrders.lastKey()){
+                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                orderSuccess =  doOrder(orderRate, availableOrders);
 
-
-            }
-
-
-
-            double quoteRate = marketRate.getQuoteRate();
-
-            while(quoteRate >= currPairOrders.firstKey() && orderSuccess==false){
-
-                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
-
-
-                while(availableOrders.isEmpty()==false
-                        || orderSuccess==false){
-                    Order orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
-                        //BUY is success
-
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
-                        if(orderAvl.getTotalOrder()==0){
-                            availableOrders.poll();
-                        }
-
-                        orderSuccess = true;
-                    }else{
-                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
-                        availableOrders.poll();
-                    }
-
-                    if(availableOrders.isEmpty() == true){
-                        currPairOrders.pollFirstEntry();
-                    }
-
+                if(availableOrders.isEmpty() == true){
+                    currPairOrders.pollFirstEntry();
                 }
 
-
-
-
-            }
-
-
-
-
-        }else{
-
-
-            ConcurrentSkipListMap<Double, LinkedBlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
-
-            double quoteRate = marketRate.getQuoteRate();
-
-            while(quoteRate <= currPairOrders.lastKey() && orderSuccess==false){
-
-                LinkedBlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
-
-
-                while(availableOrders.isEmpty()==false
-                        || orderSuccess==false){
-                    Order orderAvl = availableOrders.peek();
-                    if(marketRate.getTotalOrder() >= orderAvl.getTotalOrder()){
-                        //SELL is success
-
-                        orderAvl.setTotalOrder(orderAvl.getTotalOrder() - marketRate.getTotalOrder());
-                        if(orderAvl.getTotalOrder()==0){
-                            availableOrders.poll();
-                        }
-
-                        orderSuccess = true;
-                    }else{
-                        marketRate.setTotalOrder(marketRate.getTotalOrder() - orderAvl.getTotalOrder());
-                        availableOrders.poll();
-                    }
-
-                    if(availableOrders.isEmpty() == true){
-                        currPairOrders.pollLastEntry();
-                    }
-
-                }
-
-
+                useMarketRate =useMarketRateOffer(orderRate);
+                currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
 
 
             }
-
-
-
-
         }
 
-        return   orderSuccess;
+        return orderSuccess;
 
 
 
@@ -304,8 +257,2081 @@ public class OrderBook {
 
 
 
+    public static void main(String params[]){
+        OrderBook orderBook = OrderBook.getInstance();
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
 
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
+        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+    }
 
 
 
 }
+
