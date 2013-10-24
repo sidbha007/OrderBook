@@ -1,5 +1,6 @@
 package com.mainlab.order;
 
+import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.*;
@@ -24,6 +25,8 @@ public class OrderBook {
     private ConcurrentMap<String, Lock> offerMarketRateLock = new ConcurrentHashMap<String, Lock>();
     private ConcurrentMap<String, Lock> offerOrderLock = new ConcurrentHashMap<String, Lock>();
     private ConcurrentMap<String, Lock> bidOrderLock = new ConcurrentHashMap<String, Lock>();
+
+    private Queue<OrderLog> orderDoneLog = new ConcurrentLinkedQueue<OrderLog>();
 
     private static OrderBook uniqueInstance = new OrderBook();
 
@@ -103,14 +106,20 @@ public class OrderBook {
                 //BUY is success
 
                 liqAvl.setTotalOrder(liqAvl.getTotalOrder() - order.getTotalOrder());
-                System.out.println("Full Match Occured between\n" + order + "\n" + liqAvl );
+                //System.out.println("Full Match Occured between\n" + order + "\n" + liqAvl );
+                OrderLog ordrLog =new OrderLog(order, liqAvl, order.getQuoteRate(), order.getTotalOrder());
+                orderDoneLog.add(ordrLog) ;
+                System.out.println("Full Match Occured between\n" + ordrLog );
                 if(liqAvl.getTotalOrder()==0){
                     availableLiquidity.poll();
                 }
                 return true;
             }else{
                 order.setTotalOrder(order.getTotalOrder() - liqAvl.getTotalOrder());
-                System.out.println("Partial Match Occured between\n" + order + "\n" + liqAvl );
+                //System.out.println("Partial Match Occured between\n" + order + "\n" + liqAvl );
+                OrderLog ordrLog =new OrderLog(order, liqAvl, order.getQuoteRate(), liqAvl.getTotalOrder());
+                orderDoneLog.add(ordrLog) ;
+                System.out.println("Partial Match Occured\n" + ordrLog );
                 availableLiquidity.poll();
             }
 
@@ -261,13 +270,13 @@ public class OrderBook {
         OrderBook orderBook = OrderBook.getInstance();
         orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
         orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
-        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC","EUR/USD",10000, Order.QuoteType.OFFER, 1.1234));
+        orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC", "EUR/USD", 10000, Order.QuoteType.OFFER, 1.1234));
         orderBook.addOfferOrder(Order.createNewOrder(12,"EUR/USD",30000, Order.QuoteType.OFFER, 1.1233));
         orderBook.addOfferOrder(Order.createNewOrder(13,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
         orderBook.addOfferOrder(Order.createNewOrder(14,"EUR/JPY",30000, Order.QuoteType.OFFER, 1.1233));
         orderBook.addOfferOrder(Order.createNewOrder(15,"EUR/USD",8000, Order.QuoteType.OFFER, 1.1233));
         orderBook.addOfferOrder(Order.createNewOrder(16,"EUR/USD",10000, Order.QuoteType.OFFER, 1.1233));
-        orderBook.addBidOrder(Order.createNewOrder(172,"EUR/USD",10000, Order.QuoteType.BID, 1.1235));
+        orderBook.addBidOrder(Order.createNewOrder(172, "EUR/USD", 10000, Order.QuoteType.BID, 1.1235));
 
         orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB","EUR/USD",50000, Order.QuoteType.BID, 1.1234));
         orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA","EUR/JPY",50000, Order.QuoteType.BID, 1.1234));
