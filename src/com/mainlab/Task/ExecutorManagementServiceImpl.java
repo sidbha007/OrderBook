@@ -1,7 +1,5 @@
 package com.mainlab.Task;
 
-import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.CompletionService;
 import java.util.concurrent.ExecutionException;
@@ -10,10 +8,28 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
-import java.util.concurrent.LinkedBlockingQueue;
 
 public class ExecutorManagementServiceImpl implements ExecutionManagementService{
-	volatile List<Callable<TaskExecutionResult>> executableTaskList = new LinkedList<Callable<TaskExecutionResult>>();
+
+	private volatile List<Callable<TaskExecutionResult>> executableTaskList ;
+
+	private volatile static ExecutorManagementServiceImpl singleThreadPoolInstance;
+
+	private ExecutorManagementServiceImpl(){
+
+	}
+
+	public static ExecutorManagementServiceImpl getInstance() {
+		if (singleThreadPoolInstance == null) {
+			synchronized (ExecutorManagementServiceImpl.class) {
+				if (singleThreadPoolInstance == null) {
+					singleThreadPoolInstance = new ExecutorManagementServiceImpl();
+				}
+			}
+		}
+		return singleThreadPoolInstance;
+	}
+
 
 	@Override
 	public void execute() {
@@ -24,7 +40,7 @@ public class ExecutorManagementServiceImpl implements ExecutionManagementService
 				executorService);
 
 		try {
-			List<Callable<TaskExecutionResult>> executableTasks = executableTaskList;
+			List<Callable<TaskExecutionResult>> executableTasks = getTaskList();
 			for (Callable<TaskExecutionResult> callable : executableTasks) {
 				taskCompletionService.submit(callable);
 			}
@@ -42,12 +58,14 @@ public class ExecutorManagementServiceImpl implements ExecutionManagementService
 		executorService.shutdown();
 
 	}
-
-
-	public List<Callable<TaskExecutionResult>> createExecutableTaskList(Callable<TaskExecutionResult> bidTask) {
-		// TODO Auto-generated method stub
-
-		executableTaskList.add(bidTask);
-		return executableTaskList;
+	
+	
+	public List<Callable<TaskExecutionResult>> getTaskList(){
+		return this.executableTaskList;
 	}
+	
+	public void setTaskList (List<Callable<TaskExecutionResult>> taskList){
+		this.executableTaskList = taskList;
+	}
+	
 }
