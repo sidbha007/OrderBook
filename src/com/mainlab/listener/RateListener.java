@@ -3,6 +3,11 @@ package com.mainlab.listener;
 import com.integral.is.message.MarketRate;
 import com.integral.is.message.MarketRateSerializer;
 import com.integral.is.message.V1MarketRateSerializer;
+import com.mainlab.Task.BidMarketQuoteExecutionTask;
+import com.mainlab.Task.ExecutorManagementServiceImpl;
+import com.mainlab.Task.OfferMarketQuoteExecutionTask;
+import com.mainlab.Utilities.Currencies;
+import com.mainlab.order.Order;
 
 import javax.jms.*;
 
@@ -48,6 +53,9 @@ public class RateListener implements MessageListener {
                 System.out.println( "Rate is null for Adaptor ");
 
             }else{
+                ExecutorManagementServiceImpl.getInstance().execute(new OfferMarketQuoteExecutionTask(Order.createNewMarketOrder(rate.getProviderShortName(), Currencies.valueOf(rate.getBaseCcy()),Currencies.valueOf(rate.getVariableCcy()), (long)rate.getOfferLimit(), Order.QuoteType.OFFER, rate.getOfferRate())));
+                ExecutorManagementServiceImpl.getInstance().execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder(rate.getProviderShortName(), Currencies.valueOf(rate.getBaseCcy()),Currencies.valueOf(rate.getVariableCcy()), (long)rate.getBidLimit(), Order.QuoteType.BID, rate.getBidRate())));
+
                 System.out.println( rate.getBaseCcy() + " " + rate.getQuoteId() + " " + rate.getBaseCcy() + " " + rate.getBidLimit() + " " + rate.getBaseCcyIndex() + " " + rate.getProviderShortName() + " " + rate.getAllTiers() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId() + " " + rate.getQuoteId());
             }
         }
