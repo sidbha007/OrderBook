@@ -1,8 +1,6 @@
 package com.mainlab.order;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -16,15 +14,12 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class OrderBookV3 {
 
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Buy
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Orders offer for Sell
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Orders offer for Buy
+    private Map<String, NavigableMap<Double, List<Order>>> bidMarketRate = new HashMap<String, NavigableMap<Double, List<Order>>>(); //Maintain list of Market Rates offer for Sell
+    private Map<String, NavigableMap<Double, List<Order>>> offerMarketRate= new HashMap<String, NavigableMap<Double, List<Order>>>(); //Maintain list of Market Rates offer for Buy
+    private Map<String, NavigableMap<Double, List<Order>>> offerOrder= new HashMap<String, NavigableMap<Double, List<Order>>>(); //Maintain list of Orders offer for Sell
+    private Map<String, NavigableMap<Double, List<Order>>> bidOrder= new HashMap<String, NavigableMap<Double, List<Order>>>(); //Maintain list of Orders offer for Buy
 
-    private ConcurrentMap<String, Lock> bidMarketRateLock = new ConcurrentHashMap<String, Lock>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentMap<String, Lock> offerMarketRateLock = new ConcurrentHashMap<String, Lock>();
-    private ConcurrentMap<String, Lock> offerOrderLock = new ConcurrentHashMap<String, Lock>();
-    private ConcurrentMap<String, Lock> bidOrderLock = new ConcurrentHashMap<String, Lock>();
+
 
     private Queue<OrderLog> orderDoneLog = new ConcurrentLinkedQueue<OrderLog>();
 
@@ -39,11 +34,10 @@ public class OrderBookV3 {
     public void addOfferMarketQuote(Order offerMarketQuote){
 
         //System.out.println(offerMarketQuote);
-        offerMarketRateLock.putIfAbsent(offerMarketQuote.getCurrPair(), new ReentrantLock());
         boolean orderSuccess=matchMarketRate(offerMarketQuote);
         if(orderSuccess==false){
             offerMarketRate.putIfAbsent(offerMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerMarketRate.get(offerMarketQuote.getCurrPair());
+            NavigableMap<Double, BlockingQueue<Order>> currMap = offerMarketRate.get(offerMarketQuote.getCurrPair());
             currMap.putIfAbsent(offerMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(offerMarketQuote.getQuoteRate()).add(offerMarketQuote);
         }
@@ -56,7 +50,7 @@ public class OrderBookV3 {
         boolean orderSuccess=matchMarketRate(bidMarketQuote);
         if(orderSuccess==false){
             bidMarketRate.putIfAbsent(bidMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidMarketRate.get(bidMarketQuote.getCurrPair());
+            NavigableMap<Double, BlockingQueue<Order>> currMap = bidMarketRate.get(bidMarketQuote.getCurrPair());
             currMap.putIfAbsent(bidMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(bidMarketQuote.getQuoteRate()).add(bidMarketQuote);
         }
@@ -70,7 +64,7 @@ public class OrderBookV3 {
         boolean orderSuccess=matchOrder(bidOrderQuote);
         if(orderSuccess==false){
             bidOrder.putIfAbsent(bidOrderQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidOrder.get(bidOrderQuote.getCurrPair()) ;
+            NavigableMap<Double, BlockingQueue<Order>> currMap = bidOrder.get(bidOrderQuote.getCurrPair()) ;
             currMap.putIfAbsent(bidOrderQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(bidOrderQuote.getQuoteRate()).add(bidOrderQuote);
         }
@@ -83,7 +77,7 @@ public class OrderBookV3 {
         boolean orderSuccess=matchOrder(offerOrderQuote);
         if(orderSuccess==false){
             offerOrder.putIfAbsent(offerOrderQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerOrder.get(offerOrderQuote.getCurrPair()) ;
+            NavigableMap<Double, BlockingQueue<Order>> currMap = offerOrder.get(offerOrderQuote.getCurrPair()) ;
             currMap.putIfAbsent(offerOrderQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(offerOrderQuote.getQuoteRate()).add(offerOrderQuote);
         }
@@ -137,7 +131,7 @@ public class OrderBookV3 {
         boolean orderSuccess=false;
         if(marketRate.getOfferType().equals(Order.QuoteType.BID) && null!=offerOrder && null!=offerOrder.get(marketRate.getCurrPair())){
 
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+            NavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
 
             while(orderSuccess==false && currPairOrders.isEmpty()==false
                     && marketRate.getQuoteRate() >= currPairOrders.firstKey()){
@@ -154,7 +148,7 @@ public class OrderBookV3 {
 
         }else if(null!=bidOrder && null!=bidOrder.get(marketRate.getCurrPair())){
 
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+            NavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
 
             while(orderSuccess==false && currPairOrders.isEmpty()==false
                     && marketRate.getQuoteRate() <= currPairOrders.lastKey()){
@@ -212,7 +206,7 @@ public class OrderBookV3 {
             boolean useMarketRate =useMarketRateBid(orderRate);
 
 
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?offerMarketRate.get(orderRate.getCurrPair()):offerOrder.get(orderRate.getCurrPair())) ;
+            NavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?offerMarketRate.get(orderRate.getCurrPair()):offerOrder.get(orderRate.getCurrPair())) ;
 
             while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
                     && orderRate.getQuoteRate() >= currPairOrders.lastKey()){
@@ -238,7 +232,7 @@ public class OrderBookV3 {
             boolean useMarketRate =useMarketRateOffer(orderRate);
 
 
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
+            NavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
 
             while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
                     && orderRate.getQuoteRate() <= currPairOrders.lastKey()){
@@ -293,8 +287,8 @@ public class OrderBookV3 {
 
            // });
 
-		
-		
+
+
 		}
 	}
 
