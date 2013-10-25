@@ -1,8 +1,12 @@
 package com.mainlab.order;
 
+import com.mainlab.Task.*;
+import com.mainlab.Utilities.ConcurrentTwoDimensionalArrayList;
+import com.mainlab.Utilities.Currencies;
+
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -16,19 +20,32 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 public class OrderBook {
 
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidMarketRate = new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerMarketRate= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Market Rates offer for Buy
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> offerOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Orders offer for Sell
-    private ConcurrentMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>> bidOrder= new ConcurrentHashMap<String, ConcurrentNavigableMap<Double, BlockingQueue<Order>>>(); //Maintain list of Orders offer for Buy
+    private ConcurrentTwoDimensionalArrayList bidMarketRate = new ConcurrentTwoDimensionalArrayList(); //Maintain list of Market Rates offer for Sell
+    private ConcurrentTwoDimensionalArrayList offerMarketRate=  new ConcurrentTwoDimensionalArrayList(); //Maintain list of Market Rates offer for Buy
+    private ConcurrentTwoDimensionalArrayList offerOrder= new ConcurrentTwoDimensionalArrayList(); //Maintain list of Orders offer for Sell
+    private ConcurrentTwoDimensionalArrayList bidOrder=  new ConcurrentTwoDimensionalArrayList(); //Maintain list of Orders offer for Buy
 
-    private ConcurrentMap<String, Lock> bidMarketRateLock = new ConcurrentHashMap<String, Lock>(); //Maintain list of Market Rates offer for Sell
-    private ConcurrentMap<String, Lock> offerMarketRateLock = new ConcurrentHashMap<String, Lock>();
-    private ConcurrentMap<String, Lock> offerOrderLock = new ConcurrentHashMap<String, Lock>();
-    private ConcurrentMap<String, Lock> bidOrderLock = new ConcurrentHashMap<String, Lock>();
+     private ConcurrentMap<String, Lock> currPairLock = new ConcurrentHashMap<String, Lock>();
 
     private Queue<OrderLog> orderDoneLog = new ConcurrentLinkedQueue<OrderLog>();
 
     private static OrderBook uniqueInstance = new OrderBook();
+
+
+    private void initializeAll(){
+        bidMarketRate = new ConcurrentTwoDimensionalArrayList();//Maintain list of Market Rates offer for Sell
+        offerMarketRate=new ConcurrentTwoDimensionalArrayList(); //Maintain list of Market Rates offer for Buy
+        offerOrder= new ConcurrentTwoDimensionalArrayList(); //Maintain list of Orders offer for Sell
+        bidOrder= new ConcurrentTwoDimensionalArrayList();//Maintain list of Orders offer for Buy
+        currPairLock = new ConcurrentHashMap<String, Lock>();
+        orderDoneLog = new ConcurrentLinkedQueue<OrderLog>();
+    }
+
+
+    public void clearAll(){
+        initializeAll();
+    }
+
 
     public static OrderBook getInstance(){
         return uniqueInstance;
@@ -39,26 +56,54 @@ public class OrderBook {
     public void addOfferMarketQuote(Order offerMarketQuote){
 
         //System.out.println(offerMarketQuote);
-        offerMarketRateLock.putIfAbsent(offerMarketQuote.getCurrPair(), new ReentrantLock());
-        boolean orderSuccess=matchMarketRate(offerMarketQuote);
+        currPairLock.putIfAbsent(offerMarketQuote.getCurrPair(), new ReentrantLock());
+
+        currPairLock.get(offerMarketQuote.getCurrPair()).lock();
+
+
+        try{
+           boolean orderSuccess = matchMarketRate(offerMarketQuote);
+
         if(orderSuccess==false){
-            offerMarketRate.putIfAbsent(offerMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerMarketRate.get(offerMarketQuote.getCurrPair());
+
+            if (null==offerMarketRate.getConcurrentSkipListCell(offerMarketQuote.getBaseCcy(),offerMarketQuote.getVarCcy())) {
+                offerMarketRate.addOrderPairQuote(offerMarketQuote.getBaseCcy(),offerMarketQuote.getVarCcy(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>() );
+            }
+
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerMarketRate.getConcurrentSkipListCell(offerMarketQuote.getBaseCcy(), offerMarketQuote.getVarCcy());
             currMap.putIfAbsent(offerMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(offerMarketQuote.getQuoteRate()).add(offerMarketQuote);
+
+        }
+        }finally{
+            currPairLock.get(offerMarketQuote.getCurrPair()).unlock();
         }
         //System.out.println(offerMarketQuote);
     }
 
     public void addBidMarketQuote(Order bidMarketQuote){
         //System.out.println(bidMarketQuote);
-        bidMarketRateLock.putIfAbsent(bidMarketQuote.getCurrPair(), new ReentrantLock());
-        boolean orderSuccess=matchMarketRate(bidMarketQuote);
+        currPairLock.putIfAbsent(bidMarketQuote.getCurrPair(), new ReentrantLock());
+
+        currPairLock.get(bidMarketQuote.getCurrPair()).lock();
+
+        try{
+            boolean orderSuccess=matchMarketRate(bidMarketQuote);
+
         if(orderSuccess==false){
-            bidMarketRate.putIfAbsent(bidMarketQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidMarketRate.get(bidMarketQuote.getCurrPair());
+
+            if (null==bidMarketRate.getConcurrentSkipListCell(bidMarketQuote.getBaseCcy(),bidMarketQuote.getVarCcy())) {
+                bidMarketRate.addOrderPairQuote(bidMarketQuote.getBaseCcy(),bidMarketQuote.getVarCcy(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>() );
+            }
+
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidMarketRate.getConcurrentSkipListCell(bidMarketQuote.getBaseCcy(), bidMarketQuote.getVarCcy());
             currMap.putIfAbsent(bidMarketQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(bidMarketQuote.getQuoteRate()).add(bidMarketQuote);
+
+        }
+        }finally{
+            currPairLock.get(bidMarketQuote.getCurrPair()).unlock();
+
         }
         //System.out.println(bidMarketQuote);
     }
@@ -66,26 +111,58 @@ public class OrderBook {
 
     public void addBidOrder(Order bidOrderQuote){
         //System.out.println(bidOrderQuote);
-        bidOrderLock.putIfAbsent(bidOrderQuote.getCurrPair(), new ReentrantLock());
-        boolean orderSuccess=matchOrder(bidOrderQuote);
+        currPairLock.putIfAbsent(bidOrderQuote.getCurrPair(), new ReentrantLock());
+
+        currPairLock.get(bidOrderQuote.getCurrPair()).lock();
+        boolean orderSuccess = false;
+        try{
+            orderSuccess=matchOrder(bidOrderQuote);
+
+
         if(orderSuccess==false){
-            bidOrder.putIfAbsent(bidOrderQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidOrder.get(bidOrderQuote.getCurrPair()) ;
+
+
+            if (null==bidOrder.getConcurrentSkipListCell(bidOrderQuote.getBaseCcy(),bidOrderQuote.getVarCcy())) {
+                bidOrder.addOrderPairQuote(bidOrderQuote.getBaseCcy(),bidOrderQuote.getVarCcy(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>() );
+            }
+
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = bidOrder.getConcurrentSkipListCell(bidOrderQuote.getBaseCcy(), bidOrderQuote.getVarCcy());
             currMap.putIfAbsent(bidOrderQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(bidOrderQuote.getQuoteRate()).add(bidOrderQuote);
+
+        }
+        }finally{
+            currPairLock.get(bidOrderQuote.getCurrPair()).unlock();
+
         }
         //System.out.println(bidOrderQuote);
     }
 
     public void addOfferOrder(Order offerOrderQuote){
         //System.out.println(offerOrderQuote);
-        offerOrderLock.putIfAbsent(offerOrderQuote.getCurrPair(), new ReentrantLock());
-        boolean orderSuccess=matchOrder(offerOrderQuote);
+        currPairLock.putIfAbsent(offerOrderQuote.getCurrPair(), new ReentrantLock());
+
+        currPairLock.get(offerOrderQuote.getCurrPair()).lock();
+
+        try{
+            boolean orderSuccess =matchOrder(offerOrderQuote);
+
+
+
         if(orderSuccess==false){
-            offerOrder.putIfAbsent(offerOrderQuote.getCurrPair(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>());
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerOrder.get(offerOrderQuote.getCurrPair()) ;
+
+            if (null==offerOrder.getConcurrentSkipListCell(offerOrderQuote.getBaseCcy(),offerOrderQuote.getVarCcy())) {
+                offerOrder.addOrderPairQuote(offerOrderQuote.getBaseCcy(),offerOrderQuote.getVarCcy(), new ConcurrentSkipListMap<Double, BlockingQueue<Order>>() );
+            }
+
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currMap = offerOrder.getConcurrentSkipListCell(offerOrderQuote.getBaseCcy(), offerOrderQuote.getVarCcy());
             currMap.putIfAbsent(offerOrderQuote.getQuoteRate(), new LinkedBlockingQueue<Order>());
             currMap.get(offerOrderQuote.getQuoteRate()).add(offerOrderQuote);
+
+        }
+        }finally{
+            currPairLock.get(offerOrderQuote.getCurrPair()).unlock();
+
         }
         //System.out.println(offerOrderQuote);
     }
@@ -135,38 +212,43 @@ public class OrderBook {
 
     public boolean matchMarketRate(Order marketRate){
         boolean orderSuccess=false;
-        if(marketRate.getOfferType().equals(Order.QuoteType.BID) && null!=offerOrder && null!=offerOrder.get(marketRate.getCurrPair())){
 
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.get(marketRate.getCurrPair()) ;
+        if(marketRate.getOfferType().equals(Order.QuoteType.BID) && null!=offerOrder){
 
-            while(orderSuccess==false && currPairOrders.isEmpty()==false
-                    && marketRate.getQuoteRate() >= currPairOrders.firstKey()){
 
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
+                ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = offerOrder.getConcurrentSkipListCell(marketRate.getBaseCcy(), marketRate.getVarCcy()) ;
+                if(null!=currPairOrders){
+                    while(orderSuccess==false && currPairOrders.isEmpty()==false
+                            && marketRate.getQuoteRate() >= currPairOrders.firstKey()){
 
-                orderSuccess =  doOrder(marketRate, availableOrders);
+                        BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.firstKey());
 
-                if(availableOrders.isEmpty() == true){
-                    currPairOrders.pollFirstEntry();
+                        orderSuccess =  doOrder(marketRate, availableOrders);
+
+                        if(availableOrders.isEmpty() == true){
+                            currPairOrders.pollFirstEntry();
+                        }
+
+                    }
                 }
 
-            }
 
-        }else if(null!=bidOrder && null!=bidOrder.get(marketRate.getCurrPair())){
+        }else if(null!=bidOrder){
 
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.get(marketRate.getCurrPair()) ;
+                ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = bidOrder.getConcurrentSkipListCell(marketRate.getBaseCcy(), marketRate.getVarCcy()) ;
+                if(null!=currPairOrders){
+                    while(orderSuccess==false && currPairOrders.isEmpty()==false
+                            && marketRate.getQuoteRate() <= currPairOrders.lastKey()){
 
-            while(orderSuccess==false && currPairOrders.isEmpty()==false
-                    && marketRate.getQuoteRate() <= currPairOrders.lastKey()){
+                        BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
+                        orderSuccess =  doOrder(marketRate, availableOrders);
 
-                BlockingQueue<Order> availableOrders = currPairOrders.get(currPairOrders.lastKey());
-                orderSuccess =  doOrder(marketRate, availableOrders);
+                        if(availableOrders.isEmpty() == true){
+                            currPairOrders.pollFirstEntry();
+                        }
 
-                if(availableOrders.isEmpty() == true){
-                    currPairOrders.pollFirstEntry();
+                    }
                 }
-
-            }
 
         }
 
@@ -177,26 +259,28 @@ public class OrderBook {
 
 
     private boolean useMarketRateBid(Order orderRate){
-        if(null==offerMarketRate || null==offerMarketRate.get(orderRate.getCurrPair())
-                || offerMarketRate.get(orderRate.getCurrPair()).isEmpty()==true){
+
+        if(null==offerMarketRate || null==offerMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())
+                || offerMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).isEmpty()==true){
             return false;
-        }else if(null==offerOrder || null==offerOrder.get(orderRate.getCurrPair())
-                || offerOrder.get(orderRate.getCurrPair()).isEmpty()==true){
+        }else if(null==offerOrder || null==offerOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())
+                || offerOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).isEmpty()==true){
             return true;
         }else{
-            return ( offerMarketRate.get(orderRate.getCurrPair()).firstKey() <= offerOrder.get(orderRate.getCurrPair()).firstKey());
+            return ( offerMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).firstKey() <= offerOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).firstKey());
         }
     }
 
     private boolean useMarketRateOffer(Order orderRate){
-        if(null==bidMarketRate || null==bidMarketRate.get(orderRate.getCurrPair())
-                || bidMarketRate.get(orderRate.getCurrPair()).isEmpty()==true){
+
+        if(null==bidMarketRate || null==bidMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())
+                || bidMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).isEmpty()==true){
             return false;
-        }else if(null==bidOrder || null==bidOrder.get(orderRate.getCurrPair())
-                || bidOrder.get(orderRate.getCurrPair()).isEmpty()==true){
+        }else if(null==bidOrder || null==bidOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())
+                || bidOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).isEmpty()==true){
             return true;
         }else{
-            return ( bidMarketRate.get(orderRate.getCurrPair()).firstKey() >= bidOrder.get(orderRate.getCurrPair()).firstKey());
+            return ( bidMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).firstKey() >= bidOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()).firstKey());
         }
 
     }
@@ -205,14 +289,14 @@ public class OrderBook {
 
         boolean orderSuccess=false;
         if(orderRate.getOfferType().equals(Order.QuoteType.BID) &&
-                ((null!=offerMarketRate && null!=offerMarketRate.get(orderRate.getCurrPair()))
-                 || (null!=offerOrder && null!=offerOrder.get(orderRate.getCurrPair())))
+                ((null!=offerMarketRate )
+                        || (null!=offerOrder ))
                 ){
+
 
             boolean useMarketRate =useMarketRateBid(orderRate);
 
-
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?offerMarketRate.get(orderRate.getCurrPair()):offerOrder.get(orderRate.getCurrPair())) ;
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?offerMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()):offerOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())) ;
 
             while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
                     && orderRate.getQuoteRate() >= currPairOrders.lastKey()){
@@ -224,21 +308,20 @@ public class OrderBook {
                 }
 
                 useMarketRate =useMarketRateBid(orderRate);
-                currPairOrders = (useMarketRate==true?offerMarketRate.get(orderRate.getCurrPair()):offerOrder.get(orderRate.getCurrPair())) ;
+                currPairOrders =(useMarketRate==true?offerMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()):offerOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())) ;
 
 
             }
 
 
         }else if(
-                (null!=bidMarketRate && null!=bidMarketRate.get(orderRate.getCurrPair()))
-                        || (null!=bidOrder && null!=bidOrder.get(orderRate.getCurrPair()))
-        ){
+                (null!=bidMarketRate)
+                        || (null!=bidOrder )
+                ){
 
             boolean useMarketRate =useMarketRateOffer(orderRate);
 
-
-            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
+            ConcurrentNavigableMap<Double, BlockingQueue<Order>> currPairOrders = (useMarketRate==true?bidMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()):bidOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())) ;
 
             while(orderSuccess==false && currPairOrders!=null && currPairOrders.isEmpty()==false
                     && orderRate.getQuoteRate() <= currPairOrders.lastKey()){
@@ -250,10 +333,11 @@ public class OrderBook {
                 }
 
                 useMarketRate =useMarketRateOffer(orderRate);
-                currPairOrders = (useMarketRate==true?bidMarketRate.get(orderRate.getCurrPair()):bidOrder.get(orderRate.getCurrPair())) ;
+                currPairOrders = (useMarketRate==true?bidMarketRate.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy()):bidOrder.getConcurrentSkipListCell(orderRate.getBaseCcy(), orderRate.getVarCcy())) ;
 
 
             }
+
         }
 
         return orderSuccess;
@@ -265,38 +349,74 @@ public class OrderBook {
     }
 
 
-    static String[] currPairs = new String[]{"EUR/USD", "EUR/JPY", "INR/USD", "INR/JPY", "USD/CHA", "CHA, JPY"};
+    static String[] currPairs = new String[]{"EUR/USD", "EUR/JPY", "INR/USD", "INR/JPY", "USD/CNY", "CNY/JPY"};
     static volatile int i=0;
     public static void main(String params[]){
 
 
         OrderBook orderBook = OrderBook.getInstance();
-        //ExecutorService executor = Executors.newFixedThreadPool(5);
-        for(i=0; i< 2500; i++){
+
+        ExecutionManagementService  execMgmtSrv = ExecutorManagementServiceImpl.getInstance();
+//        execMgmtSrv.execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder("DBNB",Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234)));
+//        execMgmtSrv.execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder("DNBA",Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234)));
+//        execMgmtSrv.execute(new OfferMarketQuoteExecutionTask(Order.createNewMarketOrder("ABC", Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.OFFER, 1.1234)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 1,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 2,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 3,Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 4,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),8000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 5,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new BidOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 6, Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.BID, 1.1235)));
+
+//        execMgmtSrv.execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder("DBNB",Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234)));
+//       execMgmtSrv.execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder("DNBA",Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234)));
+//        execMgmtSrv.execute(new OfferMarketQuoteExecutionTask(Order.createNewMarketOrder("ABC", Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.OFFER, 1.1234)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 1,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 2,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 3,Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 4,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),8000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 5,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233)));
+//        execMgmtSrv.execute(new BidOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 6, Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.BID, 1.1235)));
+//
+
+
+        // ExecutorService executor = Executors.newFixedThreadPool(5);
+        for(i=0; i< 25000; i++){
 
 
            /* executor.execute(new Runnable(){
 
                 public void run(){   */
-                    //OrderBook orderBook = OrderBook.getInstance();
-                    orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNB",currPairs[i%6],50000, Order.QuoteType.BID, 1.1234));
-                    orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA",currPairs[(i+1)%6],50000, Order.QuoteType.BID, 1.1234));
-                    orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC", currPairs[i%6], 10000, Order.QuoteType.OFFER, 1.1234));
-                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 1,currPairs[i%6],30000, Order.QuoteType.OFFER, 1.1233));
-                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 2,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
-                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 3,currPairs[(i+1)%6],30000, Order.QuoteType.OFFER, 1.1233));
-                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 4,currPairs[i%6],8000, Order.QuoteType.OFFER, 1.1233));
-                    orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 5,currPairs[i%6],10000, Order.QuoteType.OFFER, 1.1233));
-                    orderBook.addBidOrder(Order.createNewOrder(((i+1)*6) + 6, currPairs[i%6], 10000, Order.QuoteType.BID, 1.1235));
-               // }
+            //OrderBook orderBook = OrderBook.getInstance();
+            execMgmtSrv.execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder("DBNB",Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234)));
+            execMgmtSrv.execute(new BidMarketQuoteExecutionTask(Order.createNewMarketOrder("DNBA",Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234)));
+            execMgmtSrv.execute(new OfferMarketQuoteExecutionTask(Order.createNewMarketOrder("ABC", Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.OFFER, 1.1234)));
+            execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 1,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233)));
+            execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 2,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233)));
+            execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 3,Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233)));
+            execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 4,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),8000, Order.QuoteType.OFFER, 1.1233)));
+            execMgmtSrv.execute(new OfferOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 5,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233)));
+            execMgmtSrv.execute(new BidOrderExecutionTask(Order.createNewOrder(((i+1)*6) + 6, Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.BID, 1.1235)));
 
 
-           // });
 
-		
-		
-		}
-	}
+            //orderBook.addBidMarketQuote(Order.createNewMarketOrder("DBNB",Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234));
+            //orderBook.addBidMarketQuote(Order.createNewMarketOrder("DNBA",Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),50000, Order.QuoteType.BID, 1.1234));
+            //orderBook.addOfferMarketQuote(Order.createNewMarketOrder("ABC", Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.OFFER, 1.1234));
+            //orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 1,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233));
+            //orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 2,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233));
+           // orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 3,Currencies.valueOf(currPairs[(i+1)%6].split("/")[0]),Currencies.valueOf(currPairs[(i+1)%6].split("/")[1]),30000, Order.QuoteType.OFFER, 1.1233));
+           // orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 4,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),8000, Order.QuoteType.OFFER, 1.1233));
+           // orderBook.addOfferOrder(Order.createNewOrder(((i+1)*6) + 5,Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]),10000, Order.QuoteType.OFFER, 1.1233));
+           // orderBook.addBidOrder(Order.createNewOrder(((i+1)*6) + 6, Currencies.valueOf(currPairs[i%6].split("/")[0]),Currencies.valueOf(currPairs[i%6].split("/")[1]), 10000, Order.QuoteType.BID, 1.1235));
+            // }
+
+
+            // });
+
+
+
+        }
+    }
 
 
 }

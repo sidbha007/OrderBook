@@ -5,17 +5,15 @@ import java.util.concurrent.Callable;
 import com.mainlab.order.Order;
 import com.mainlab.order.OrderBook;
 
-public  class OfferMarketQuoteExecutionTask implements Callable<TaskExecutionResult> {
-	Order order;
-	OfferMarketQuoteExecutionTask(){
-		
-	}
+public  class OfferMarketQuoteExecutionTask implements Runnable {
+	private Order order;
+
 	public OfferMarketQuoteExecutionTask( Order order){
 		this.order = order;
     }
     /** Access the task execution result */
-    @Override public TaskExecutionResult call() throws Exception {
-    	OrderBook.getInstance().addOfferMarketQuote(order);
-    		return OrderBook.getInstance().ordrLogR;
+    @Override
+    public void run() {
+        OrderBook.getInstance().addOfferMarketQuote(order);
     }
   }

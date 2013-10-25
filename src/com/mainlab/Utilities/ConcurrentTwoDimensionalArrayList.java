@@ -1,6 +1,7 @@
 package com.mainlab.Utilities;
 
 import java.util.EnumMap;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -21,20 +22,20 @@ public class ConcurrentTwoDimensionalArrayList {
 
 	}*/
 
-	private final static ConcurrentSkipListMap<Double,Order> emptyValue = null;
+	private final static ConcurrentSkipListMap<Double,BlockingQueue<Order>> emptyValue = null;
 
-	CopyOnWriteArrayList <CopyOnWriteArrayList<ConcurrentSkipListMap<Double,Order>>> currencyPairCells;
-	CopyOnWriteArrayList <ConcurrentSkipListMap<Double,Order>> currencyRow = null; // new CopyOnWriteArrayList <ConcurrentSkipListMap<Integer,Order>>();
+	CopyOnWriteArrayList <CopyOnWriteArrayList<ConcurrentSkipListMap<Double,BlockingQueue<Order>>>> currencyPairCells;
+	CopyOnWriteArrayList <ConcurrentSkipListMap<Double,BlockingQueue<Order>>> currencyRow = null; // new CopyOnWriteArrayList <ConcurrentSkipListMap<Integer,Order>>();
 
 
 
 
 	public ConcurrentTwoDimensionalArrayList() {
-		currencyPairCells= new CopyOnWriteArrayList <CopyOnWriteArrayList<ConcurrentSkipListMap<Double,Order>>>() ;
+		currencyPairCells= new CopyOnWriteArrayList <CopyOnWriteArrayList<ConcurrentSkipListMap<Double,BlockingQueue<Order>>>>() ;
 		for (int i = 0 ; i < 150 ; i ++){
-			currencyRow =  new CopyOnWriteArrayList <ConcurrentSkipListMap<Double,Order>>();
+            CopyOnWriteArrayList <ConcurrentSkipListMap<Double,BlockingQueue<Order>>> currencyRow =  new CopyOnWriteArrayList <ConcurrentSkipListMap<Double,BlockingQueue<Order>>>();
 			for (int j=0;j<150;j++){
-				currencyRow.add(j,emptyValue);
+				currencyRow.add(j, null);
 			}
 			currencyPairCells.add(i,currencyRow);
 		}
@@ -190,8 +191,14 @@ public class ConcurrentTwoDimensionalArrayList {
 	}
 
 
+    public ConcurrentSkipListMap<Double,BlockingQueue<Order>> getConcurrentSkipListCell (Currencies rowCurr, Currencies colCurr) {
+       int row = getCurrenciesMap().get(rowCurr);
+       int col = getCurrenciesMap().get(colCurr);
+       return getConcurrentSkipListCell (row, col);
+    }
 
-	public ConcurrentSkipListMap<Double,Order> getConcurrentSkipListCell (int row, int col) {
+
+	public ConcurrentSkipListMap<Double,BlockingQueue<Order>> getConcurrentSkipListCell (int row, int col) {
 		try{
 			return currencyPairCells.get(row).get(col);
 		}catch (IndexOutOfBoundsException e){
@@ -200,15 +207,15 @@ public class ConcurrentTwoDimensionalArrayList {
 				return null;
 			}else{
 				System.out.println ("New currency pair is requested, adding the new currency pair in new cell.");
-				return new ConcurrentSkipListMap<Double,Order>(); 
+				return new ConcurrentSkipListMap<Double,BlockingQueue<Order>>(); 
 			}
 		}
 	}
 
 	public void deleteOrderPair (int row, int col){
 		try{
-			currencyRow.set(col,emptyValue);
-			currencyPairCells.set(row, currencyRow);
+
+            currencyPairCells.get(row).set(col,emptyValue );
 		}catch (IndexOutOfBoundsException e){
 			if (row > 150 || col > 150){
 				System.out.println ("Invalid currency pair is requested.");
@@ -218,10 +225,10 @@ public class ConcurrentTwoDimensionalArrayList {
 		}
 	}
 
-	public void addOrderPairQuote (int row, int col, ConcurrentSkipListMap<Double,Order> price){
+	public void addOrderPairQuote (int row, int col, ConcurrentSkipListMap<Double,BlockingQueue<Order>> price){
 		try{
-			currencyRow.set(col, price);
-			currencyPairCells.set(row,currencyRow);
+            currencyPairCells.get(row).set(col,price );
+
 		}catch (IndexOutOfBoundsException e){
 			if (row > 150 || col > 150){
 				System.out.println ("Invalid currency pair is requested.");
@@ -231,6 +238,11 @@ public class ConcurrentTwoDimensionalArrayList {
 		}
 	}
 
+    public void addOrderPairQuote (Currencies rowCurr, Currencies colCurr, ConcurrentSkipListMap<Double,BlockingQueue<Order>> price){
+        int row = getCurrenciesMap().get(rowCurr);
+        int col = getCurrenciesMap().get(colCurr);
+        addOrderPairQuote( row,  col, price);
+    }
 
 
 }

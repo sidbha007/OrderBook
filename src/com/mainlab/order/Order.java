@@ -1,5 +1,7 @@
 package com.mainlab.order;
 
+import com.mainlab.Utilities.Currencies;
+
 import java.util.Date;
 
 /**
@@ -14,19 +16,22 @@ public class Order {
         BID, OFFER
     }
     private String liqProvider;
-    private String currPair;
+    private Currencies baseCcy;
+    private Currencies varCcy;
     private long totalOrder;
     private QuoteType offerType;
     private int orderId;
     private double quoteRate;
     private long timestamp;
+    private static final String CURR_KEY_SEP = ":";
 
     private Order() {
     }
 
-    public static Order createNewOrder(int orderId, String currPair, long totalOrder, QuoteType offerType,  double quoteRate) {
+    public static Order createNewOrder(int orderId, Currencies baseCcy, Currencies varCcy, long totalOrder, QuoteType offerType,  double quoteRate) {
         Order order = new Order();
-        order.setCurrPair(currPair);
+        order.setBaseCcy(baseCcy);
+        order.setVarCcy(varCcy);
         order.setTotalOrder(totalOrder);
         order.setOfferType(offerType);
         order.setOrderId(orderId);
@@ -35,9 +40,10 @@ public class Order {
         return order;
     }
 
-    public static Order createNewMarketOrder(String liqProvider, String currPair, long totalOrder, QuoteType offerType, double quoteRate) {
+    public static Order createNewMarketOrder(String liqProvider, Currencies baseCcy, Currencies varCcy, long totalOrder, QuoteType offerType, double quoteRate) {
         Order order = new Order();
-        order.setCurrPair(currPair);
+        order.setBaseCcy(baseCcy);
+        order.setVarCcy(varCcy);
         order.setTotalOrder(totalOrder);
         order.setOfferType(offerType);
         order.setLiqProvider(liqProvider);
@@ -54,12 +60,25 @@ public class Order {
         this.liqProvider = liqProvider;
     }
 
-    public String getCurrPair() {
-        return currPair;
+    public Currencies getBaseCcy() {
+        return baseCcy;
     }
 
-    public void setCurrPair(String currPair) {
-        this.currPair = currPair;
+    public void setBaseCcy(Currencies baseCcy) {
+        this.baseCcy = baseCcy;
+    }
+
+    public Currencies getVarCcy() {
+        return varCcy;
+    }
+
+
+    public String getCurrPair(){
+        return  this.getBaseCcy() + CURR_KEY_SEP + this.getVarCcy();
+    }
+
+    public void setVarCcy(Currencies varCcy) {
+        this.varCcy = varCcy;
     }
 
     public long getTotalOrder() {
@@ -102,11 +121,13 @@ public class Order {
         this.timestamp = timestamp;
     }
 
+
     @Override
     public String toString() {
         return "Order{" +
                 "liqProvider='" + liqProvider + '\'' +
-                ", currPair='" + currPair + '\'' +
+                ", baseCcy='" + baseCcy + '\'' +
+                ", varCcy='" + varCcy + '\'' +
                 ", totalOrder=" + totalOrder +
                 ", offerType=" + offerType +
                 ", orderId=" + orderId +
